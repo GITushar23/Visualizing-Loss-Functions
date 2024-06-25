@@ -4,6 +4,7 @@ import torch.nn as nn
 import numpy as np
 from PIL import Image
 from torchvision import transforms
+import imageio
 
 # Define the autoencoder model
 class Autoencoder(nn.Module):
@@ -21,7 +22,7 @@ class Autoencoder(nn.Module):
             nn.Linear(128, 784),
             nn.ReLU()
         )
-
+    
     def forward(self, x):
         x = self.encoder(x)
         x = self.decoder(x)
@@ -48,6 +49,21 @@ def load_image(image_path):
     image = image.view(-1, 784).float()
     return image
 
+# Function to create GIF
+def create_gif(image, loss_fn):
+    frames = []
+    for epoch in range(1, 31):
+        model = load_model(loss_fn, epoch)
+        with torch.no_grad():
+            output = model(image)
+            output = output.view(28, 28).numpy()
+        frame = (output * 255).astype(np.uint8)
+        frame = Image.fromarray(frame).resize((100, 100))  # Resize frames to match epoch image size
+        frames.append(frame)
+    gif_path = f"temp_{loss_fn}.gif"
+    frames[0].save(gif_path, save_all=True, append_images=frames[1:], duration=200, loop=0)  # Loop continuously
+    return gif_path
+
 # Sidebar for selecting options
 st.sidebar.header("Options")
 show_all_losses = st.sidebar.checkbox("Show all loss functions", value=True)
@@ -60,10 +76,16 @@ uploaded_file = st.sidebar.file_uploader("Upload an image", type=["png", "jpg", 
 if uploaded_file:
     digit = None
 else:
-    digit = st.sidebar.selectbox("Digit", [None] + list(range(10)), index=1)  # Added None option and set default to None
+    digit = st.sidebar.selectbox("Digit", [None] + list(range(10)), index=1)
 
-epochs = list(range(1, 31))
-selected_epochs = st.sidebar.multiselect("Epochs", epochs, default=[1, 5, 10, 15, 20, 25, 30])
+# New option for GIF
+show_gif = st.sidebar.checkbox("Show GIF of all epochs", value=False)
+
+if show_gif:
+    selected_epochs = []  # Empty list when GIF is selected
+else:
+    epochs = list(range(1, 31))
+    selected_epochs = st.sidebar.multiselect("Epochs", epochs, default=[1, 5, 10, 15, 20, 25, 30])
 
 st.title("Autoencoder Visualization")
 
@@ -92,13 +114,18 @@ loss_function_titles = {
 
 loss_functions = ["abs", "mse", "smoothabs"] if show_all_losses else [loss_function]
 
-# Display reconstructed images for selected epochs
+# Display reconstructed images or GIF
 for loss_fn in loss_functions:
-    st.subheader(loss_function_titles[loss_fn])
-    cols = st.columns(len(selected_epochs))
-    for col, epoch in zip(cols, selected_epochs):
-        model = load_model(loss_fn, epoch)
-        with torch.no_grad():
-            output = model(image)
-            output = output.view(28, 28).numpy()
-        col.image(output, caption=f"Epoch {epoch}", use_column_width=False, width=100, clamp=True)
+    
+    if show_gif:
+        gif_path = create_gif(image, loss_fn)
+        st.image(gif_path, caption=f"GIF of all epochs for {loss_fn}", use_column_width=False, width=100)
+    else:
+        st.subheader(loss_function_titles[loss_fn])
+        cols = st.columns(len(selected_epochs))
+        for col, epoch in zip(cols, selected_epochs):
+            model = load_model(loss_fn, epoch)
+            with torch.no_grad():
+                output = model(image)
+                output = output.view(28, 28).numpy()
+            col.image(output, caption=f"Epoch {epoch}", use_column_width=False, width=100, clamp=True)
