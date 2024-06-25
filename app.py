@@ -116,12 +116,12 @@ loss_functions = ["abs", "mse", "smoothabs"] if show_all_losses else [loss_funct
 
 # Display reconstructed images or GIF
 for loss_fn in loss_functions:
+    st.subheader(loss_function_titles[loss_fn])
     
     if show_gif:
         gif_path = create_gif(image, loss_fn)
         st.image(gif_path, caption=f"GIF of all epochs for {loss_fn}", use_column_width=False, width=100)
     else:
-        st.subheader(loss_function_titles[loss_fn])
         cols = st.columns(len(selected_epochs))
         for col, epoch in zip(cols, selected_epochs):
             model = load_model(loss_fn, epoch)
